@@ -1,10 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useCallback } from "react";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// @ts-expect-error Fabric exports just a namespace in its ESM build
-import * as fabricLib from "fabric";
-// Resolve the actual fabric namespace regardless of export style
-const fabric: any = (fabricLib as any).fabric ?? fabricLib;
+import { fabric } from "fabric";
 
 const CANVAS_ID = "sandbox-whiteboard-canvas";
 

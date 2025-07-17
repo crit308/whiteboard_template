@@ -1,7 +1,8 @@
 "use client";
 import React, { useEffect, useRef, useCallback } from "react";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { fabric } from "fabric";
+// Dynamic import of Fabric to avoid ESM export issues during Next.js build
+let fabric: any; // will be assigned on client
 
 const CANVAS_ID = "sandbox-whiteboard-canvas";
 
@@ -57,29 +58,37 @@ export default function WhiteboardCanvas() {
     const canvasEl = document.getElementById(CANVAS_ID) as HTMLCanvasElement;
     if (!canvasEl) return;
 
-    const fabricCanvas = new fabric.Canvas(canvasEl, {
-      selection: true,
-      backgroundColor: "#ffffff",
-    });
-    fabricRef.current = fabricCanvas;
+    (async () => {
+      if (!fabric) {
+        // @ts-ignore dynamic import
+        const mod = await import("fabric");
+        fabric = (mod as any).fabric ?? mod;
+      }
 
-    // Enable free drawing by default
-    fabricCanvas.isDrawingMode = true;
-    fabricCanvas.freeDrawingBrush.color = "#000000";
-    fabricCanvas.freeDrawingBrush.width = 2;
+      const fabricCanvas = new fabric.Canvas(canvasEl, {
+        selection: true,
+        backgroundColor: "#ffffff",
+      });
+      fabricRef.current = fabricCanvas;
 
-    // Push first history state
-    pushHistory();
+      // Enable free drawing by default
+      fabricCanvas.isDrawingMode = true;
+      fabricCanvas.freeDrawingBrush.color = "#000000";
+      fabricCanvas.freeDrawingBrush.width = 2;
 
-    // Record history on object addition/modification
-    const record = () => pushHistory();
-    fabricCanvas.on("path:created", record);
-    fabricCanvas.on("object:modified", record);
+      // Push first history state
+      pushHistory();
 
-    // Cleanup
-    return () => {
-      fabricCanvas.dispose();
-    };
+      // Record history on object addition/modification
+      const record = () => pushHistory();
+      fabricCanvas.on("path:created", record);
+      fabricCanvas.on("object:modified", record);
+
+      // Cleanup
+      return () => {
+        fabricCanvas.dispose();
+      };
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

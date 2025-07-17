@@ -1,15 +1,15 @@
 "use client";
 import React, { useEffect, useRef, useCallback } from "react";
-// @ts-expect-error – fabric ships untyped ESM build; treat namespace default export
-import fabricNamespace from "fabric";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const fabric: any = (fabricNamespace as any).fabric || fabricNamespace;
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// @ts-expect-error Fabric exports just a namespace in its ESM build
+import * as fabricLib from "fabric";
+// Resolve the actual fabric namespace regardless of export style
+const fabric: any = (fabricLib as any).fabric ?? fabricLib;
 
 const CANVAS_ID = "sandbox-whiteboard-canvas";
 
 export default function WhiteboardCanvas() {
-  const fabricRef = useRef<fabric.Canvas | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fabricRef = useRef<any | null>(null);
   const historyRef = useRef<any[]>([]);
   const historyIndexRef = useRef<number>(-1);
 

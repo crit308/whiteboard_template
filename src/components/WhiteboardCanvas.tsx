@@ -32,7 +32,7 @@ export default function WhiteboardCanvas() {
         },
         "*",
       );
-    } catch (_) {}
+    } catch {}
   };
 
   const undo = () => {
@@ -60,7 +60,7 @@ export default function WhiteboardCanvas() {
 
     (async () => {
       if (!fabric) {
-        // @ts-ignore dynamic import
+        // @ts-expect-error dynamic import lacks types
         const mod = await import("fabric");
         fabric = (mod as any).fabric ?? mod;
       }
@@ -89,7 +89,6 @@ export default function WhiteboardCanvas() {
         fabricCanvas.dispose();
       };
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Message listener for commands from parent iframe

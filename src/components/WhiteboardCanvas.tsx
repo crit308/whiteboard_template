@@ -1,13 +1,16 @@
 "use client";
 import React, { useEffect, useRef, useCallback } from "react";
-// @ts-ignore – fabric types may not be installed in sandbox runtime
-import { fabric } from "fabric";
+// @ts-expect-error – fabric ships untyped ESM build; treat namespace default export
+import fabricNamespace from "fabric";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const fabric: any = (fabricNamespace as any).fabric || fabricNamespace;
 
 const CANVAS_ID = "sandbox-whiteboard-canvas";
 
 export default function WhiteboardCanvas() {
   const fabricRef = useRef<fabric.Canvas | null>(null);
-  const historyRef = useRef<fabric.Object[][]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const historyRef = useRef<any[]>([]);
   const historyIndexRef = useRef<number>(-1);
 
   // Helpers

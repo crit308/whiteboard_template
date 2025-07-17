@@ -1,24 +1,16 @@
 "use client";
+import dynamic from "next/dynamic";
 import { useEffect } from "react";
 
-export default function WhiteboardPlaceholder() {
+// Dynamically import Fabric canvas component only on client side
+const WhiteboardCanvas = dynamic(() => import("../components/WhiteboardCanvas"), {
+  ssr: false,
+});
+
+export default function WhiteboardPage() {
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.parent?.postMessage({ ns: "ai-tutor/wb", type: "ready" }, "*");
-    }
+    window.parent?.postMessage({ ns: "ai-tutor/wb", type: "ready" }, "*");
   }, []);
 
-  return (
-    <main
-      style={{
-        display: "flex",
-        height: "100vh",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "sans-serif",
-      }}
-    >
-      <h1>Sandbox Whiteboard – template repo</h1>
-    </main>
-  );
+  return <WhiteboardCanvas />;
 }

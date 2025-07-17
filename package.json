@@ -12,7 +12,8 @@
     "convex": "^1.25.4",
     "next": "15.4.1",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "fabric": "^6.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

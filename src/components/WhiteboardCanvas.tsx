@@ -60,9 +60,8 @@ export default function WhiteboardCanvas() {
 
     (async () => {
       if (!fabric) {
-        // @ts-expect-error dynamic import lacks types
-        const mod = await import("fabric");
-        fabric = (mod as any).fabric ?? mod;
+        const mod: any = await import("fabric");
+        fabric = mod.fabric ?? mod;
       }
 
       const fabricCanvas = new fabric.Canvas(canvasEl, {

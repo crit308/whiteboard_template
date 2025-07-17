@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Sandbox Integration
+
+When running inside the AI-Tutor sandbox the following public paths are expected:
+
+- `/` – renders the whiteboard UI (currently a placeholder) and on mount posts
+  `parent.postMessage({ ns: 'ai-tutor/wb', type: 'ready' }, '*')` so the parent
+  page can mark the iframe as ready.
+- `/api/health` – lightweight JSON health check that returns `{ ok: true }`.
+
+If you move the main UI elsewhere, remember to update the sandbox launcher
+accordingly.

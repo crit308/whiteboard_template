@@ -1,4 +1,13 @@
+"use client";
+import { useEffect } from "react";
+
 export default function WhiteboardPlaceholder() {
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.parent?.postMessage({ ns: "ai-tutor/wb", type: "ready" }, "*");
+    }
+  }, []);
+
   return (
     <main
       style={{

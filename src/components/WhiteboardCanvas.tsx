@@ -490,9 +490,9 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
     const cmdListener = (ev: MessageEvent) => {
       if (!ev.data || ev.data.ns !== "ai-tutor/wb" || ev.data.type !== "command") return;
       const action = ev.data.payload?.action;
-      if (action === "undo") undo();
-      else if (action === "redo") redo();
-      else if (action === "setZoom") {
+        if (action === "undo") undo();
+        else if (action === "redo") redo();
+        else if (action === "setZoom") {
         const zoom = ev.data.payload?.args?.zoom ?? 1;
         if (fabricCanvasRef.current) {
           fabricCanvasRef.current.setZoom(zoom);
@@ -539,4 +539,4 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
       )}
     </div>
   );
-}
+} 

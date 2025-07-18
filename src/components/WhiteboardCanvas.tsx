@@ -364,11 +364,14 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
 
     const canvas = fabricCanvasRef.current;
 
-    // For MVP, clear and redraw all objects on each update.
-    // Background color is lost on clear, so we restore.
-    const bgColor = canvas.backgroundColor;
-    canvas.clear();
-    canvas.setBackgroundColor(bgColor, () => {});
+    // Clear & redraw; guard for Fabric v6 changes
+    const bgColor: any = (canvas as any).backgroundColor;
+    if (typeof canvas.clear === "function") canvas.clear();
+    if (typeof (canvas as any).setBackgroundColor === "function") {
+      (canvas as any).setBackgroundColor(bgColor, () => {});
+    } else {
+      (canvas as any).backgroundColor = bgColor;
+    }
 
     // Clear widget layer
     if (widgetLayerRef.current) {

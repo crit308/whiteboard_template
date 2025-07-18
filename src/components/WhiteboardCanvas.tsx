@@ -254,6 +254,7 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
   }, []);
 
   // --------------------- Fabric initialisation -----------------------------
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const initFabric = async () => {
       if (!canvasRef.current || !containerRef.current) return;
@@ -357,6 +358,7 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
   }, []);
 
   // -------------- Sync inbound Convex objects to Fabric -------------------
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!fabricCanvasRef.current || objects === undefined) return;
 

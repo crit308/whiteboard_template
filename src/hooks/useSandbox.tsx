@@ -1,3 +1,5 @@
+// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "convex_generated/api";

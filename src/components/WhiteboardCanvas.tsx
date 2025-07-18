@@ -140,6 +140,13 @@ export default function WhiteboardCanvas() {
     );
   }
 
+  useEffect(() => {
+    // Notify parent that iframe is ready for init handshake
+    try {
+      window.parent?.postMessage({ ns: "ai-tutor/wb", v: 1, type: "ready" }, "*");
+    } catch (_) {}
+  }, []);
+
   return (
     <ConvexProvider client={convexClientRef.current}>
       <InnerWhiteboard sessionId={init.sessionId} />

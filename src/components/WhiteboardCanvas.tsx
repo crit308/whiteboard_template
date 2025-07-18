@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, @typescript-eslint/no-require-imports, react-hooks/rules-of-hooks, react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 // NEW WHITEBOARD CANVAS IMPLEMENTATION WITH CONVEX INTEGRATION
 import React, {
   useEffect,
@@ -8,7 +8,7 @@ import React, {
   useState,
   useMemo,
 } from "react";
-import { ConvexReactClient, ConvexProvider } from "convex/react";
+import { ConvexReactClient, ConvexProvider, useQuery as convexUseQuery, useMutation as convexUseMutation } from "convex/react";
 
 // `fabric` does not ship proper ESM types yet, so we rely on dynamic import
 let fabric: any; // will be assigned on the client only
@@ -131,26 +131,25 @@ export default function WhiteboardCanvas() {
     convexClientRef.current = client;
   }, [init]);
 
-  // While waiting for handshake, show placeholder
-  if (!init || !convexClientRef.current) {
-    return (
-      <div style={{ width: "100vw", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        Connecting …
-      </div>
-    );
-  }
-
+  // Notify parent that iframe is ready (once)
   useEffect(() => {
-    // Notify parent that iframe is ready for init handshake
     try {
       window.parent?.postMessage({ ns: "ai-tutor/wb", v: 1, type: "ready" }, "*");
     } catch (_) {}
   }, []);
 
   return (
-    <ConvexProvider client={convexClientRef.current}>
-      <InnerWhiteboard sessionId={init.sessionId} />
-    </ConvexProvider>
+    <div style={{ width: "100vw", height: "100vh" }}>
+      {(!init || !convexClientRef.current) ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+          Connecting …
+        </div>
+      ) : (
+        <ConvexProvider client={convexClientRef.current}>
+          <InnerWhiteboard sessionId={init.sessionId} />
+        </ConvexProvider>
+      )}
+    </div>
   );
 }
 
@@ -176,18 +175,9 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const addObject = (0 as any) as ReturnType<typeof useCallback>; // placeholder to satisfy TS prior to dynamic assignment
 
-  // Lazy-import Convex React hooks (avoid ESM in sandbox build)
-  const loadConvexHooks = () => {
-    // dynamic require to ensure proper top-level order
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { useQuery, useMutation } = require("convex/react");
-    return { useQuery, useMutation } as {
-      useQuery: typeof import("convex/react").useQuery;
-      useMutation: typeof import("convex/react").useMutation;
-    };
-  };
-
-  const { useQuery, useMutation } = useMemo(() => loadConvexHooks(), []);
+  // Use Convex React hooks directly (single React instance)
+  const useQuery = convexUseQuery;
+  const useMutation = convexUseMutation;
 
   const objects: WBObjectSpec[] | undefined = useQuery(
     "database/whiteboard:getWhiteboardObjects" as any,
@@ -495,17 +485,19 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
   // ---------------- Parent commands listener ------------------------------
   useEffect(() => {
     const cmdListener = (ev: MessageEvent) => {
-      if (!ev.data || ev.data.ns !== "ai-tutor/wb" || ev.data.type !== "command") return;
-      const action = ev.data.payload?.action;
+      if (!ev.data || ev.data.ns !== "ai-tutor/wb") return;
+
+      if (ev.data.type === "command") {
+        const action = ev.data.payload?.action;
         if (action === "undo") undo();
         else if (action === "redo") redo();
         else if (action === "setZoom") {
-        const zoom = ev.data.payload?.args?.zoom ?? 1;
-        if (fabricCanvasRef.current) {
-          fabricCanvasRef.current.setZoom(zoom);
+          const zoom = ev.data.payload?.args?.zoom ?? 1;
+          if (fabricCanvasRef.current) {
+            fabricCanvasRef.current.setZoom(zoom);
+          }
         }
-      }
-      else if (ev.data.type === "jump") {
+      } else if (ev.data.type === "jump") {
         const { objects } = ev.data.payload ?? {};
         if (!objects) return;
         const fc = fabricCanvasRef.current;

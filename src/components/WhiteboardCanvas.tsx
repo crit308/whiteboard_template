@@ -158,6 +158,7 @@ export default function WhiteboardCanvas() {
 // =============================================================================
 function InnerWhiteboard({ sessionId }: { sessionId: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const fabricCanvasRef = useRef<any | null>(null);
   const widgetLayerRef = useRef<HTMLDivElement | null>(null);
   const historyRef = useRef<any[]>([]);
@@ -232,15 +233,18 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
   // --------------------- Fabric initialisation -----------------------------
   useEffect(() => {
     const initFabric = async () => {
-      if (!canvasRef.current) return;
+      if (!canvasRef.current || !containerRef.current) return;
       if (!fabric) {
         const mod: any = await import("fabric");
         fabric = mod.fabric ?? mod;
       }
 
+      const parentRect = containerRef.current.getBoundingClientRect();
       const fabricCanvas = new fabric.Canvas(canvasRef.current, {
         selection: true,
         backgroundColor: "#ffffff",
+        width: parentRect.width,
+        height: parentRect.height,
       });
       fabricCanvas.isDrawingMode = true;
       fabricCanvas.freeDrawingBrush.color = "#000000";
@@ -356,6 +360,15 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
           lastSnapshotTsRef.current = Date.now();
         }
       }, 5000);
+
+      // Resize on window resize
+      const handleResize = () => {
+        const rect = containerRef.current!.getBoundingClientRect();
+        fabricCanvas.setWidth(rect.width);
+        fabricCanvas.setHeight(rect.height);
+        fabricCanvas.requestRenderAll();
+      };
+      window.addEventListener("resize", handleResize);
     };
 
     initFabric();
@@ -517,8 +530,8 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
 
   // ---------------- UI -----------------------------------------------------
   return (
-    <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
-      <canvas id={CANVAS_ID} ref={canvasRef} style={{ border: "1px solid #e5e7eb" }} />
+    <div ref={containerRef} style={{ width: "100vw", height: "100vh", position: "relative" }}>
+      <canvas id={CANVAS_ID} ref={canvasRef} style={{ border: "1px solid #e5e7eb", width: "100%", height: "100%" }} />
       <div ref={widgetLayerRef} style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />
       {historyBanner && (
         <div

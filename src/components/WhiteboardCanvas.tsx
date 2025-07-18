@@ -8,6 +8,7 @@ import React, {
   useState,
   useMemo,
 } from "react";
+import ReactDOM from "react-dom/client";
 import { ConvexReactClient, ConvexProvider, useQuery as convexUseQuery, useMutation as convexUseMutation } from "convex/react";
 
 // `fabric` does not ship proper ESM types yet, so we rely on dynamic import
@@ -38,24 +39,25 @@ interface WBInkSpec {
 interface WBEllipseSpec {
   id: string;
   kind: "ellipse";
-  cx: number;
-  cy: number;
-  rx: number;
-  ry: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
   fill?: string;
   stroke?: string;
+  strokeWidth?: number;
   metadata?: Record<string, any>;
 }
 
 interface WBArrowSpec {
   id: string;
   kind: "arrow";
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  color?: string;
-  width?: number;
+  x: number;
+  y: number;
+  points: number[][]; // relative points
+  stroke?: string;
+  strokeWidth?: number;
+  arrowType?: string;
   metadata?: Record<string, any>;
 }
 
@@ -71,7 +73,29 @@ interface WBWidgetSpec {
   metadata?: Record<string, any>;
 }
 
-type WBObjectSpec = WBInkSpec | WBRectSpec | WBEllipseSpec | WBArrowSpec | WBWidgetSpec;
+interface WBLineSpec {
+  id: string;
+  kind: "line";
+  x: number;
+  y: number;
+  points: number[][];
+  stroke?: string;
+  strokeWidth?: number;
+  metadata?: Record<string, any>;
+}
+
+interface WBTextSpec {
+  id: string;
+  kind: "text";
+  x: number;
+  y: number;
+  text: string;
+  fontSize?: number;
+  fill?: string;
+  metadata?: Record<string, any>;
+}
+
+type WBObjectSpec = WBInkSpec | WBRectSpec | WBEllipseSpec | WBArrowSpec | WBLineSpec | WBTextSpec | WBWidgetSpec;
 
 declare global {
   interface Window {
@@ -241,73 +265,19 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
 
       const parentRect = containerRef.current.getBoundingClientRect();
       const fabricCanvas = new fabric.Canvas(canvasRef.current, {
-        selection: true,
+        selection: false,
         backgroundColor: "#ffffff",
         width: parentRect.width,
         height: parentRect.height,
       });
-      fabricCanvas.isDrawingMode = true;
-      fabricCanvas.freeDrawingBrush.color = "#000000";
-      fabricCanvas.freeDrawingBrush.width = 2;
+      fabricCanvas.isDrawingMode = false;
 
       fabricCanvasRef.current = fabricCanvas;
 
       // Record initial blank state
       pushHistory();
 
-      // Outbound: when user finishes drawing, create object in Convex
-      fabricCanvas.on("path:created", async (evt: any) => {
-        const pathObj = evt.path as any;
-        if (!pathObj) return;
-
-        const svg = pathObj.toSVG?.() ?? "";
-        // Extract d attribute from <path d="..." />
-        const match = svg.match(/d=\"([^\"]+)\"/);
-        const d = match ? match[1] : "";
-
-        const spec: WBInkSpec = {
-          id: genId(),
-          kind: "ink",
-          d,
-          stroke: pathObj.stroke,
-          width: pathObj.strokeWidth,
-        };
-
-        try {
-          await addWhiteboardObject({ sessionId, objectSpec: spec });
-
-          mutationCounterRef.current += 1;
-         
-          // Send lightweight snapshot of current objects to parent for history
-          try {
-            const objectsJson = fabricCanvas.toJSON(["selectable"]).objects as any;
-            window.parent?.postMessage(
-              {
-                ns: "ai-tutor/wb",
-                type: "snapshot",
-                payload: {
-                  index: Date.now(),
-                  objects: objectsJson,
-                },
-              },
-              "*",
-            );
-          } catch (_err) {
-            // Reset counters
-            mutationCounterRef.current = 0;
-            lastSnapshotTsRef.current = Date.now();
-          }
-        } catch (err) {
-          console.error("Failed to add whiteboard object", err);
-        }
-
-        pushHistory();
-      });
-
-      // Track modifications & deletions for history
-      const record = () => pushHistory();
-      fabricCanvas.on("object:modified", record);
-      fabricCanvas.on("object:removed", record);
+      // Disable user-driven modifications; no path creation or object modification listeners
 
       // Expose helper API for AI / parent window ---------------------------
       window.whiteboard = {
@@ -404,7 +374,7 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
       widgetLayerRef.current.innerHTML = "";
     }
 
-    for (const obj of objects) {
+    for (const obj of objects as any[]) {
       if (obj.kind === "ink") {
         const path = new fabric.Path(obj.d, {
           stroke: obj.stroke || "#000000",
@@ -429,11 +399,16 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
         canvas.add(rect);
       }
       else if (obj.kind === "ellipse") {
+        // Adapt to WB schema: x,y refer to top-left of bounding box; width/height are diameters
+        const left = (obj as any).x;
+        const top = (obj as any).y;
+        const width = (obj as any).width ?? 0;
+        const height = (obj as any).height ?? 0;
         const ellipse = new fabric.Ellipse({
-          left: (obj as any).cx - (obj as any).rx,
-          top: (obj as any).cy - (obj as any).ry,
-          rx: (obj as any).rx,
-          ry: (obj as any).ry,
+          left,
+          top,
+          rx: width / 2,
+          ry: height / 2,
           fill: (obj as any).fill ?? "",
           stroke: (obj as any).stroke ?? "#000000",
           selectable: false,
@@ -441,52 +416,90 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
         (ellipse as any).metadata = { id: obj.id };
         canvas.add(ellipse);
       }
-      else if (obj.kind === "widget") {
-        // Create HTML overlay
-        if (!widgetLayerRef.current) continue;
-        const div = document.createElement("div");
-        div.style.position = "absolute";
-        const { x = 0, y = 0, width = 120, height = 60 } = (obj as any);
-        div.style.left = `${x}px`;
-        div.style.top = `${y}px`;
-        div.style.width = `${width}px`;
-        div.style.height = `${height}px`;
-        div.style.pointerEvents = "auto";
-        div.style.display = "flex";
-        div.style.alignItems = "center";
-        div.style.justifyContent = "center";
-        div.style.backgroundColor = "rgba(255,255,255,0.8)";
-        div.style.border = "1px dashed #888";
-        div.innerText = `Widget: ${(obj as any).entry || "unknown"}`;
-        widgetLayerRef.current.appendChild(div);
+      else if (obj.kind === "line") {
+        const { x, y, points, stroke, strokeWidth } = obj as any;
+        if (Array.isArray(points) && points.length >= 2) {
+          const absPts = points.map(([px, py]: number[]) => [x + px, y + py]);
+          const [p0, p1] = [absPts[0], absPts[absPts.length - 1]];
+          const line = new fabric.Line([p0[0], p0[1], p1[0], p1[1]], {
+            stroke: stroke ?? "#000000",
+            strokeWidth: strokeWidth ?? 2,
+            selectable: false,
+          });
+          (line as any).metadata = { id: obj.id };
+          canvas.add(line);
+        }
       }
       else if (obj.kind === "arrow") {
-        const { x1, y1, x2, y2, color, width } = obj as WBArrowSpec;
-        const line = new fabric.Line([x1, y1, x2, y2], {
-          stroke: color ?? "#000000",
-          strokeWidth: width ?? 2,
-          selectable: false,
-        });
-        // triangle head
-        const angle = Math.atan2(y2 - y1, x2 - x1);
-        const headLen = 10;
-        const p1x = x2 - headLen * Math.cos(angle - Math.PI / 6);
-        const p1y = y2 - headLen * Math.sin(angle - Math.PI / 6);
-        const p2x = x2 - headLen * Math.cos(angle + Math.PI / 6);
-        const p2y = y2 - headLen * Math.sin(angle + Math.PI / 6);
-        const triangle = new fabric.Polygon([
-          { x: x2, y: y2 },
-          { x: p1x, y: p1y },
-          { x: p2x, y: p2y },
-        ], {
-          fill: color ?? "#000000",
-          selectable: false,
-        });
-        const group = new fabric.Group([line, triangle], { selectable:false });
-        (group as any).metadata = { id: obj.id };
-        canvas.add(group);
+        const { x, y, points, stroke, strokeWidth } = obj as any;
+        if (Array.isArray(points) && points.length >= 2) {
+          const absPts = points.map(([px, py]: number[]) => [x + px, y + py]);
+          const [start, end] = [absPts[0], absPts[absPts.length - 1]];
+          // main line
+          const mainLine = new fabric.Line([start[0], start[1], end[0], end[1]], {
+            stroke: stroke ?? "#000000",
+            strokeWidth: strokeWidth ?? 2,
+            selectable: false,
+          });
+          // arrow head
+          const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
+          const headLen = 10;
+          const p1x = end[0] - headLen * Math.cos(angle - Math.PI / 6);
+          const p1y = end[1] - headLen * Math.sin(angle - Math.PI / 6);
+          const p2x = end[0] - headLen * Math.cos(angle + Math.PI / 6);
+          const p2y = end[1] - headLen * Math.sin(angle + Math.PI / 6);
+          const head = new fabric.Polygon([
+            { x: end[0], y: end[1] },
+            { x: p1x, y: p1y },
+            { x: p2x, y: p2y },
+          ], {
+            fill: stroke ?? "#000000",
+            selectable: false,
+          });
+          const group = new fabric.Group([mainLine, head], { selectable: false });
+          (group as any).metadata = { id: obj.id };
+          canvas.add(group);
+        }
       }
-      // TODO: handle other kinds
+      else if (obj.kind === "text") {
+        const { x, y, text, fontSize, fill } = obj as any;
+        const textbox = new fabric.Textbox(text || "", {
+          left: x,
+          top: y,
+          fontSize: fontSize ?? 16,
+          fill: fill ?? "#000000",
+          selectable: false,
+        });
+        (textbox as any).metadata = { id: obj.id };
+        canvas.add(textbox);
+      }
+      else if (obj.kind === "widget") {
+        if (!widgetLayerRef.current) continue;
+
+        const { x = 0, y = 0, width = 120, height = 60, entry, props = {}, version = 1 } = (obj as any);
+        const widgetProps = (() => { try { return JSON.parse(props as any); } catch { return {}; } })();
+
+        const host = document.createElement("div");
+        host.style.position = "absolute";
+        host.style.left = `${x}px`;
+        host.style.top = `${y}px`;
+        host.style.width = `${width}px`;
+        host.style.height = `${height}px`;
+        host.style.pointerEvents = "auto";
+        widgetLayerRef.current.appendChild(host);
+
+        const root = ReactDOM.createRoot(host);
+
+        const LazyWidget = React.lazy(() => import(/* @vite-ignore */ `/app/widgets/${encodeURIComponent(entry)}/client.js?ver=${version}`));
+
+        root.render(
+          <ErrorBoundary>
+            <React.Suspense fallback={<div style={{fontSize:12}}>…</div>}>
+              <LazyWidget {...widgetProps} />
+            </React.Suspense>
+          </ErrorBoundary>
+        );
+      }
     }
 
     canvas.requestRenderAll();
@@ -551,4 +564,27 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
       )}
     </div>
   );
+}
+
+// ---------------- ErrorBoundary -----------------------------
+class ErrorBoundary extends React.Component<{ fallback?: React.ReactNode; children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false } as any;
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any, info: any) {
+    // Emit error to parent Tutor for potential self-healing
+    try {
+      window.parent?.postMessage({ ns: "ai-tutor/wb", v: 1, type: "widget-error", payload: { error: String(error), info } }, "*");
+    } catch {}
+  }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || <div style={{ fontSize: 12, color: "#f00" }}>⚠️ widget error</div>;
+    }
+    return this.props.children;
+  }
 } 

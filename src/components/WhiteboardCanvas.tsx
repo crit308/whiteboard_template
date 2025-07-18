@@ -203,9 +203,13 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
   const useQuery = convexUseQuery;
   const useMutation = convexUseMutation;
 
+  const [boardId, setBoardId] = useState<number>(0);
+  const boardIdRef = useRef(0);
+  useEffect(() => { boardIdRef.current = boardId; }, [boardId]);
+
   const objects: WBObjectSpec[] | undefined = useQuery(
     "database/whiteboard:getWhiteboardObjects" as any,
-    { sessionId },
+    { sessionId, boardId },
   );
 
   const addWhiteboardObject = useMutation(
@@ -269,8 +273,14 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
         backgroundColor: "#ffffff",
         width: parentRect.width,
         height: parentRect.height,
+        // Disable all pointer listeners – AI-only modifications
+        evented: false,
+        hoverCursor: "default",
       });
       fabricCanvas.isDrawingMode = false;
+
+      // Also disable browser hit-testing on the underlying <canvas> element
+      (canvasRef.current as HTMLCanvasElement).style.pointerEvents = "none";
 
       fabricCanvasRef.current = fabricCanvas;
 
@@ -292,7 +302,7 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
             kind: "ink",
             d,
           };
-          await addWhiteboardObject({ sessionId, objectSpec: spec });
+          await addWhiteboardObject({ sessionId, boardId: boardIdRef.current, objectSpec: spec });
         },
         addShape: async (kind, spec) => {
           const id = genId();
@@ -309,7 +319,7 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
               return;
             }
           }
-          await addWhiteboardObject({ sessionId, objectSpec: baseSpec });
+          await addWhiteboardObject({ sessionId, boardId: boardIdRef.current, objectSpec: baseSpec });
         },
         updateObject: async (id, patch) => {
           await updateWhiteboardObject({ sessionId, objectId: id, objectSpec: patch });
@@ -361,6 +371,9 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!fabricCanvasRef.current || objects === undefined) return;
+
+    // Debug: log current object count each time Convex subscription updates
+    console.log("[WhiteboardCanvas] Received", (objects as any[])?.length ?? 0, "objects from Convex");
 
     const canvas = fabricCanvasRef.current;
 
@@ -526,6 +539,9 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
           if (fabricCanvasRef.current) {
             fabricCanvasRef.current.setZoom(zoom);
           }
+        } else if (action === "changeBoard") {
+          const targetId = ev.data.payload?.boardId ?? 0;
+          setBoardId(targetId);
         }
       } else if (ev.data.type === "jump") {
         const { objects } = ev.data.payload ?? {};

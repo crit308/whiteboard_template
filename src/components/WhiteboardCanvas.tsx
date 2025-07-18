@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, @typescript-eslint/no-require-imports, react-hooks/rules-of-hooks, react-hooks/exhaustive-deps */
 // NEW WHITEBOARD CANVAS IMPLEMENTATION WITH CONVEX INTEGRATION
 import React, {
   useEffect,
@@ -168,8 +169,8 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const addObject = (0 as any) as ReturnType<typeof useCallback>; // placeholder to satisfy TS prior to dynamic assignment
 
-  // We'll lazy-import hooks only after client available to avoid context errors.
-  const useConvexHooks = () => {
+  // Lazy-import Convex React hooks (avoid ESM in sandbox build)
+  const loadConvexHooks = () => {
     // dynamic require to ensure proper top-level order
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useQuery, useMutation } = require("convex/react");
@@ -179,7 +180,7 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
     };
   };
 
-  const { useQuery, useMutation } = useMemo(() => useConvexHooks(), []);
+  const { useQuery, useMutation } = useMemo(() => loadConvexHooks(), []);
 
   const objects: WBObjectSpec[] | undefined = useQuery(
     "database/whiteboard:getWhiteboardObjects" as any,

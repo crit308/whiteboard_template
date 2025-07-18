@@ -197,7 +197,6 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
 
   // Convex helpers -----------------------------------------------------------
   // We avoid importing generated API types; string paths work fine.
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const addObject = (0 as any) as ReturnType<typeof useCallback>; // placeholder to satisfy TS prior to dynamic assignment
 
   // Use Convex React hooks directly (single React instance)
@@ -476,7 +475,7 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
       else if (obj.kind === "widget") {
         if (!widgetLayerRef.current) continue;
 
-        const { x = 0, y = 0, width = 120, height = 60, entry, props = {}, version = 1 } = (obj as any);
+        const { x = 0, y = 0, width = 120, height = 60, entry, props = "{}", version = 1 } = (obj as any);
         const widgetProps = (() => { try { return JSON.parse(props as any); } catch { return {}; } })();
 
         const host = document.createElement("div");

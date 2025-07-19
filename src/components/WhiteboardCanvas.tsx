@@ -507,7 +507,7 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
 
         const root = ReactDOM.createRoot(host);
 
-        const LazyWidget = React.lazy(() => import(/* @vite-ignore */ `/app/widgets/${encodeURIComponent(entry)}/client.js?ver=${version}`));
+        const LazyWidget = React.lazy(() => import(/* webpackIgnore: true */ `./app/widgets/${encodeURIComponent(entry)}/client.js?ver=${version}`));
 
         root.render(
           <ErrorBoundary>

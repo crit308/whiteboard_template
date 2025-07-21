@@ -267,6 +267,11 @@ function InnerWhiteboard({ sessionId }: { sessionId: string }) {
         fabric = mod.fabric ?? mod;
       }
 
+      // Prevent duplicate initialisation (can happen in React Strict Mode or Fast Refresh)
+      if (fabricCanvasRef.current) {
+        return; // already initialised
+      }
+
       const parentRect = containerRef.current.getBoundingClientRect();
       const fabricCanvas = new fabric.Canvas(canvasRef.current, {
         selection: false,

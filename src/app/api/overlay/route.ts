@@ -6,16 +6,25 @@ import { promisify } from "util";
 
 const run = promisify(exec);
 
+interface Payload {
+  path: string;
+  content: string | null;
+}
+
 export async function POST(req: NextRequest) {
   const auth = req.headers.get("authorization");
   if (auth !== `Bearer ${process.env.OVERLAY_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { path: relPath, content } = (await req.json()) as {
-    path: string;
-    content: string | null;
-  };
+  let payload: Payload;
+  try {
+    payload = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+
+  const { path: relPath, content } = payload || {} as Payload;
   if (!relPath || !relPath.startsWith("app/")) {
     return NextResponse.json({ error: "invalid path" }, { status: 400 });
   }
@@ -34,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "write failed" }, { status: 500 });
   }
 
-  // Widget compilation
+  // If widget TSX, compile to JS so browser can import directly
   if (/^app\/widgets\/[^/]+\/client\.tsx$/.test(relPath)) {
     const entry = relPath.split("/")[2];
     const outDir = `/app/public/widgets/${entry}`;
